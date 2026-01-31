@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 AI Vision (Ollama)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; background-color: #f4f4f9; }
+        h1 { text-align: center; color: #333; }
+        
+        #chat-box { 
+            border: 1px solid #ddd; 
+            height: 400px; 
+            overflow-y: scroll; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 10px; 
+            background: white; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; max-width: 80%; }
+        .user-msg { background-color: #e3f2fd; margin-left: auto; text-align: right; color: #0d47a1; }
+        .ai-msg { background-color: #f1f8e9; margin-right: auto; text-align: left; color: #2e7d32; }
+        
+        .preview-img { max-width: 200px; border-radius: 5px; margin-top: 5px; display: block; margin-left: auto; }
+        
+        .controls { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 12px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        
+        /* ปุ่มอัปโหลดรูป */
+        .file-upload { position: relative; overflow: hidden; display: inline-block; }
+        .file-upload input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .btn-upload { background-color: #6c757d; }
+        #fileName { font-size: 0.8rem; color: #666; margin-top: 5px; text-align: right; display: block;}
+    </style>
+</head>
+<body>
+
+    <h1>👁️ คุยกับ AI (ส่งรูปได้)</h1>
+    
+    <div id="chat-box"></div>
+    
+    <div id="fileName"></div>
+    <div class="controls">
+        <div class="file-upload">
+            <button class="btn-upload">📷 เลือกรูป</button>
+            <input type="file" id="imageInput" accept="image/*" onchange="showFileName()">
+        </div>
+        <input type="text" id="userInput" placeholder="ถามเกี่ยวกับรูปนี้..." onkeydown="if(event.key==='Enter') sendMessage()">
+        <button onclick="sendMessage()">ส่ง</button>
+    </div>
+
+    <script>
+        // ฟังก์ชันแปลงไฟล์รูปเป็น Base64 (เพื่อให้ AI อ่านออก)
+        function convertToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function showFileName() {
+            const fileInput = document.getElementById('imageInput');
+            const fileNameDisplay = document.getElementById('fileName');
+            if(fileInput.files.length > 0) {
+                fileNameDisplay.textContent = "ไฟล์ที่เลือก: " + fileInput.files[0].name;
+            } else {
+                fileNameDisplay.textContent = "";
+            }
+        }
+
+        async function sendMessage() {
+            const inputField = document.getElementById("userInput");
+            const imageInput = document.getElementById("imageInput");
+            const chatBox = document.getElementById("chat-box");
+            
+            const text = inputField.value;
+            const file = imageInput.files[0];
+
+            if (!text && !file) return; // ถ้าไม่พิมพ์และไม่เลือกรูป ก็ไม่ส่ง
+
+            let base64Image = null;
+            let displayImageHtml = "";
+
+            // 1. จัดการรูปภาพ (ถ้ามี)
+            if (file) {
+                try {
+                    const fullBase64 = await convertToBase64(file);
+                    // Ollama ต้องการแค่ไส้ใน (ตัดคำว่า data:image/jpeg;base64, ออก)
+                    base64Image = fullBase64.split(',')[1]; 
+                    displayImageHtml = `<img src="${fullBase64}" class="preview-img">`;
+                } catch (e) {
+                    console.error("แปลงรูปไม่ผ่าน", e);
+                    alert("เกิดข้อผิดพลาดในการอ่านไฟล์รูป");
+                    return;
+                }
+            }
+
+            // 2. แสดงฝั่งเรา (User)
+            chatBox.innerHTML += `
+                <div class="message user-msg">
+                    ${text}
+                    ${displayImageHtml}
+                </div>`;
+            
+            // เคลียร์ค่า input
+            inputField.value = "";
+            imageInput.value = ""; 
+            document.getElementById('fileName').textContent = "";
+            
+            // แสดงสถานะกำลังคิด
+            const loadingId = "loading-" + Date.now();
+            chatBox.innerHTML += `<div class="message ai-msg" id="${loadingId}"><i>กำลังวิเคราะห์รูปภาพ...</i></div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                // เตรียมข้อมูลส่ง AI
+                const payload = {
+                    model: "llama3.2-vision",  // สำคัญ! ต้องใช้โมเดลที่ดูรูปได้
+                    messages: [{
+                        role: "user",
+                        content: text || "Describe this image", // ถ้าไม่ได้พิมพ์อะไร ให้ถามแทนว่า "อธิบายรูปนี้"
+                        images: base64Image ? [base64Image] : [] // ใส่รูปตรงนี้
+                    }],
+                    stream: false
+                };
+
+                // 3. ยิงไปหา Ollama
+                const response = await fetch("http://localhost:11434/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                // 4. แสดงคำตอบ AI
+                document.getElementById(loadingId).remove();
+                chatBox.innerHTML += `<div class="message ai-msg"><b>AI:</b> ${data.message.content}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (error) {
+                document.getElementById(loadingId).innerHTML = `<span style="color:red">เชื่อมต่อไม่ได้ (เช็ค CORS หรือ Ollama เปิดอยู่ไหม)</span>`;
+                console.error(error);
+            }
+        }
+    </script>
+
+</body>
+</html>
