@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 YOLO Object Detection</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background-color: #f0f2f5; }
+        h1 { text-align: center; color: #1a1a1a; }
+        
+        #chat-box { 
+            border: none; height: 500px; overflow-y: scroll; padding: 20px; 
+            margin-bottom: 20px; border-radius: 15px; background: white; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .message { padding: 12px 18px; border-radius: 15px; max-width: 80%; }
+        .user-msg { background-color: #007bff; color: white; align-self: flex-end; }
+        .ai-msg { background-color: #e4e6eb; color: #050505; align-self: flex-start; }
+        .preview-img { max-width: 250px; border-radius: 10px; margin-top: 10px; display: block; border: 2px solid #fff; }
+        
+        .controls { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 15px; justify-content: center; }
+        .btn-upload { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 25px; cursor: pointer; font-size: 1rem;}
+        .btn-upload:hover { background-color: #218838; }
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>🔍 YOLO Object Detection</h1>
+    
+    <div id="chat-box">
+        <div class="message ai-msg">สวัสดีครับ! อัปโหลดรูปภาพมาเลย ผมจะใช้ YOLO ตรวจจับวัตถุให้ครับ (เร็วมาก!)</div>
+    </div>
+    
+    <div class="controls">
+        <label class="btn-upload">
+            📷 เลือกรูปภาพเพื่อตรวจสอบ
+            <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload()">
+        </label>
+    </div>
+
+    <script>
+        // แปลงไฟล์เป็น Base64
+        function convertToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function handleImageUpload() {
+            const imageInput = document.getElementById("imageInput");
+            const chatBox = document.getElementById("chat-box");
+            const file = imageInput.files[0];
+
+            if (!file) return;
+
+            // 1. แสดงรูปฝั่งเรา
+            const fullBase64 = await convertToBase64(file);
+            const base64ForServer = fullBase64.split(',')[1]; // ตัดหัวทิ้ง
+
+            chatBox.innerHTML += `
+                <div class="message user-msg">
+                    ส่งรูปภาพ: ${file.name}
+                    <img src="${fullBase64}" class="preview-img">
+                </div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 2. แสดงสถานะกำลังคิด
+            const loadingId = "loading-" + Date.now();
+            chatBox.innerHTML += `<div class="message ai-msg" id="${loadingId}">⚡ YOLO กำลังสแกน...</div>`;
+            
+            try {
+                // 3. ส่งไปหา Python Server (Port 8000)
+                const response = await fetch("http://localhost:8000/detect", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ image: base64ForServer })
+                });
+
+                const data = await response.json();
+                
+                // 4. แสดงผลลัพธ์
+                document.getElementById(loadingId).remove();
+                chatBox.innerHTML += `<div class="message ai-msg"><b>ผลลัพธ์:</b> ${data.message}</div>`;
+
+            } catch (error) {
+                document.getElementById(loadingId).innerHTML = `<span style="color:red">เชื่อมต่อ Server ไม่ได้ (อย่าลืมรัน python server_yolo.py)</span>`;
+                console.error(error);
+            }
+            
+            // เคลียร์ค่า input เพื่อให้เลือกรูปเดิมซ้ำได้
+            imageInput.value = ""; 
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+
+</body>
+</html>
