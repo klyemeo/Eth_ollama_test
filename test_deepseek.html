@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek R1 (Gemini Style)</title> 
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        /* ฟอนต์และการจัดหน้าแบบ Gemini */
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f4f9; }
+        
+        /* Scrollbar สวยๆ */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* การแสดงผล Markdown */
+        .prose pre { background-color: #0d1117; border-radius: 10px; padding: 15px; margin: 10px 0; overflow-x: auto; }
+        .prose code { font-family: 'Courier New', monospace; font-size: 0.9em; }
+        .prose p { margin-bottom: 10px; line-height: 1.6; }
+        .prose ul { list-style-type: disc; padding-left: 20px; margin-bottom: 10px; }
+        .prose ol { list-style-type: decimal; padding-left: 20px; margin-bottom: 10px; }
+        
+        /* กล่องความคิด (Thinking Process) */
+        .thought-box {
+            background-color: #e2e8f0; border-left: 4px solid #94a3b8;
+            padding: 10px 15px; margin-bottom: 15px; border-radius: 0 8px 8px 0;
+            font-size: 0.9rem; color: #475569; font-style: italic;
+            display: none; /* ซ่อนไว้ก่อน */
+        }
+        .thought-toggle {
+            cursor: pointer; color: #64748b; font-size: 0.8rem;
+            display: inline-flex; items-center; gap: 5px; margin-bottom: 5px;
+            user-select: none;
+        }
+        .thought-toggle:hover { color: #334155; }
+        
+        /* Animation จุดวิ่งๆ ตอนรอ */
+        .dot-flashing {
+            position: relative; width: 6px; height: 6px;
+            border-radius: 5px; background-color: #9880ff; color: #9880ff;
+            animation: dot-flashing 1s infinite linear alternate;
+            animation-delay: 0.5s;
+        }
+        .dot-flashing::before, .dot-flashing::after {
+            content: ""; display: inline-block; position: absolute; top: 0;
+            width: 6px; height: 6px; border-radius: 5px; background-color: #9880ff; color: #9880ff;
+            animation: dot-flashing 1s infinite alternate;
+        }
+        .dot-flashing::before { left: -10px; animation-delay: 0s; }
+        .dot-flashing::after { left: 10px; animation-delay: 1s; }
+        @keyframes dot-flashing { 0% { background-color: #9880ff; } 50%, 100% { background-color: #ebe6ff; } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-800">
+
+    <aside class="w-64 bg-[#f0f4f9] flex-shrink-0 flex flex-col p-4 hidden md:flex">
+        <div class="mb-6 cursor-pointer" onclick="location.reload()">
+            <h1 class="text-xl font-semibold text-slate-700 tracking-tight flex items-center gap-2">
+                <span class="text-2xl">🐳</span> DeepSeek R1
+            </h1>
+            <p class="text-xs text-slate-500 ml-8">Local AI Model</p>
+        </div>
+        
+        <button onclick="location.reload()" class="bg-[#dde3ea] hover:bg-[#d1d9e0] text-slate-700 py-3 px-4 rounded-full text-left flex items-center gap-3 transition-colors mb-4 text-sm font-medium">
+            <span>➕</span> New Chat
+        </button>
+
+        <div class="flex-1 overflow-y-auto">
+            <div class="text-xs font-semibold text-slate-500 mb-3 px-2">Recent</div>
+            <div class="space-y-1">
+                <div class="p-2 rounded-full hover:bg-[#e6eaf1] cursor-pointer text-sm truncate text-slate-600">เขียน Python สอน AI</div>
+                <div class="p-2 rounded-full hover:bg-[#e6eaf1] cursor-pointer text-sm truncate text-slate-600">สูตรต้มยำกุ้ง</div>
+                <div class="p-2 rounded-full hover:bg-[#e6eaf1] cursor-pointer text-sm truncate text-slate-600">วิเคราะห์หุ้น</div>
+            </div>
+        </div>
+        
+        <div class="mt-auto text-xs text-slate-400 px-2">
+            Running on localhost:11434
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col bg-white md:rounded-l-3xl shadow-xl relative overflow-hidden">
+        
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32">
+            <div class="flex flex-col items-center justify-center h-full text-center opacity-80" id="welcome-screen">
+                <div class="text-5xl mb-4">🐳</div>
+                <h2 class="text-2xl font-semibold text-slate-700 mb-2">สวัสดีครับ ผมคือ DeepSeek R1</h2>
+                <p class="text-slate-500 max-w-md">ผมเป็น AI สาย Reasoning ที่มีความสามารถในการ "คิดวิเคราะห์" ก่อนตอบคำถาม ลองถามอะไรยากๆ ดูสิครับ</p>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-4 md:p-6">
+            <div class="max-w-4xl mx-auto relative">
+                <div class="bg-[#f0f4f9] rounded-3xl flex items-end p-2 shadow-inner border border-slate-200 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
+                    <textarea id="userInput" rows="1" 
+                        class="w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-4 text-slate-700 placeholder-slate-400 max-h-32 overflow-y-auto"
+                        placeholder="ถามอะไรก็ได้ที่อยากรู้..."
+                        onkeydown="handleKeyDown(event)"></textarea>
+                    
+                    <button onclick="sendMessage()" id="sendBtn" 
+                        class="p-3 m-1 bg-white hover:bg-blue-50 text-blue-600 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="text-center mt-2">
+                    <p class="text-[10px] text-slate-400">DeepSeek R1 can make mistakes. Consider checking important information.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // ตั้งค่า Markdown ให้ไฮไลท์โค้ด
+        marked.setOptions({
+            highlight: function(code, lang) {
+                const language = highlight.getLanguage(lang) ? lang : 'plaintext';
+                return highlight.highlight(code, { language }).value;
+            },
+            langPrefix: 'hljs language-'
+        });
+
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const welcomeScreen = document.getElementById('welcome-screen');
+
+        // ปรับความสูงช่องพิมพ์อัตโนมัติ
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if(this.value === '') this.style.height = 'auto';
+        });
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // ซ่อนหน้า Welcome
+            if (welcomeScreen) welcomeScreen.style.display = 'none';
+
+            // 1. แสดง User Message
+            addMessage('user', text);
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            sendBtn.disabled = true;
+
+            // 2. สร้างกล่องรอ AI Message
+            const aiMsgId = 'ai-' + Date.now();
+            const loadingHtml = `<div class="flex items-center gap-2 text-slate-500"><div class="dot-flashing"></div> กำลังคิดวิเคราะห์...</div>`;
+            addMessage('ai', loadingHtml, aiMsgId);
+
+            try {
+                // 3. ยิง Request ไปหา Ollama (Stream Mode)
+                const response = await fetch("http://localhost:11434/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: "deepseek-r1", // ชื่อโมเดล DeepSeek
+                        messages: [{ role: "user", content: text }],
+                        stream: true // เปิด Stream เพื่อให้ตัวหนังสือไหลมาทีละคำ
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = "";
+                let thinkingBuffer = "";
+                let isThinking = false;
+
+                const aiMsgDiv = document.getElementById(aiMsgId);
+                aiMsgDiv.innerHTML = ""; // เคลียร์ Loading
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (!line) continue;
+                        try {
+                            const json = JSON.parse(line);
+                            if (json.message && json.message.content) {
+                                const content = json.message.content;
+                                
+                                // จัดการ <think> tag (เอกลักษณ์ของ DeepSeek)
+                                if (content.includes('<think>')) {
+                                    isThinking = true;
+                                    thinkingBuffer = ""; // เริ่มเก็บความคิด
+                                    aiMsgDiv.innerHTML += `<div class="thought-toggle" onclick="toggleThought(this)"><span>🧠</span> ดูสิ่งที่ AI คิด (Click to expand)</div><div class="thought-box" style="display:none"></div>`;
+                                    continue; 
+                                }
+                                if (content.includes('</think>')) {
+                                    isThinking = false;
+                                    continue;
+                                }
+
+                                if (isThinking) {
+                                    // ถ้ากำลังคิด ให้เติมใส่กล่อง Thought
+                                    const thoughtBoxes = aiMsgDiv.getElementsByClassName('thought-box');
+                                    if(thoughtBoxes.length > 0) {
+                                        thoughtBoxes[thoughtBoxes.length - 1].innerHTML += content;
+                                    }
+                                } else {
+                                    // ถ้าตอบจริง ให้สะสมข้อความแล้ว Render Markdown
+                                    fullResponse += content;
+                                    // แยกส่วน Thought ออกจากส่วนเนื้อหาเพื่อ Render เฉพาะเนื้อหาใหม่
+                                    const thoughtPart = aiMsgDiv.innerHTML.split('<div class="prose">')[0] || ""; // เก็บส่วนหัว thought ไว้
+                                    
+                                    // เทคนิค: เราจะสร้าง div prose แยกต่างหากสำหรับเนื้อหา
+                                    let contentDiv = aiMsgDiv.querySelector('.response-content');
+                                    if(!contentDiv) {
+                                        contentDiv = document.createElement('div');
+                                        contentDiv.className = 'prose max-w-none text-slate-700';
+                                        contentDiv.classList.add('response-content');
+                                        aiMsgDiv.appendChild(contentDiv);
+                                    }
+                                    
+                                    // ใช้ marked แปลง Markdown เป็น HTML สวยๆ
+                                    contentDiv.innerHTML = marked.parse(fullResponse);
+                                    
+                                    // สั่ง Highlight Code
+                                    contentDiv.querySelectorAll('pre code').forEach((block) => {
+                                        hljs.highlightElement(block);
+                                    });
+                                }
+                                
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                }
+
+            } catch (error) {
+                document.getElementById(aiMsgId).innerHTML = `<span class="text-red-500">Error: เชื่อมต่อ Ollama ไม่ได้ (ตรวจสอบว่ารัน 'ollama serve' หรือยัง)</span>`;
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        function addMessage(role, htmlContent, id = null) {
+            const div = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            if (id) bubble.id = id;
+            
+            if (role === 'user') {
+                bubble.className = "bg-[#d3e3fd] text-slate-800 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[80%] shadow-sm";
+                bubble.innerHTML = htmlContent; // User ไม่ต้องมี Markdown ซับซ้อน
+            } else {
+                bubble.className = "w-full max-w-4xl pr-4 pl-0 md:pl-4"; // AI เต็มหน้าจอแบบ Gemini
+                // ใส่ Icon หน้าข้อความ AI
+                bubble.innerHTML = `
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md">DS</div>
+                        <div class="flex-1 space-y-2 overflow-hidden">${htmlContent}</div>
+                    </div>
+                `;
+            }
+
+            div.appendChild(bubble);
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // ฟังก์ชันเปิด/ปิด กล่องความคิด
+        window.toggleThought = function(element) {
+            const box = element.nextElementSibling;
+            if (box.style.display === 'none') {
+                box.style.display = 'block';
+                element.innerHTML = `<span>🔽</span> ซ่อนความคิด`;
+            } else {
+                box.style.display = 'none';
+                element.innerHTML = `<span>🧠</span> ดูสิ่งที่ AI คิด (Click to expand)`;
+            }
+        }
+    </script>
+</body>
+</html>

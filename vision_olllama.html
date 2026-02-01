@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Llama 3.2 Vision (Gemini UI)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f4f9; }
+        
+        /* Markdown Styles */
+        .prose pre { background-color: #0d1117; border-radius: 10px; padding: 15px; margin: 10px 0; overflow-x: auto; }
+        .prose code { font-family: 'Courier New', monospace; font-size: 0.9em; }
+        .prose p { margin-bottom: 10px; line-height: 1.6; }
+        .prose img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
+        
+        /* Custom Scrollbar */ 
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Animation */
+        .dot-flashing {
+            position: relative; width: 6px; height: 6px; border-radius: 5px; background-color: #9880ff; color: #9880ff;
+            animation: dot-flashing 1s infinite linear alternate; animation-delay: 0.5s;
+        }
+        .dot-flashing::before, .dot-flashing::after {
+            content: ""; display: inline-block; position: absolute; top: 0; width: 6px; height: 6px; border-radius: 5px; background-color: #9880ff; color: #9880ff;
+            animation: dot-flashing 1s infinite alternate;
+        }
+        .dot-flashing::before { left: -10px; animation-delay: 0s; }
+        .dot-flashing::after { left: 10px; animation-delay: 1s; }
+        @keyframes dot-flashing { 0% { background-color: #9880ff; } 50%, 100% { background-color: #ebe6ff; } }
+
+        /* Image Preview Box */
+        .image-preview-container {
+            display: none; position: absolute; bottom: 100%; left: 20px; 
+            background: white; padding: 5px; border-radius: 10px; 
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.1); margin-bottom: 10px;
+        }
+        .remove-img-btn {
+            position: absolute; top: -5px; right: -5px; background: red; color: white;
+            border-radius: 50%; width: 20px; height: 20px; font-size: 12px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-800">
+
+    <aside class="w-64 bg-[#f0f4f9] flex-shrink-0 flex flex-col p-4 hidden md:flex">
+        <div class="mb-6 cursor-pointer" onclick="location.reload()">
+            <h1 class="text-xl font-semibold text-slate-700 tracking-tight flex items-center gap-2">
+                <span class="text-2xl">👁️</span> Llama Vision
+            </h1>
+            <p class="text-xs text-slate-500 ml-9">Model: llama3.2-vision</p>
+        </div>
+        <button onclick="location.reload()" class="bg-[#dde3ea] hover:bg-[#d1d9e0] text-slate-700 py-3 px-4 rounded-full text-left flex items-center gap-3 transition-colors mb-4 text-sm font-medium">
+            <span>➕</span> New Chat
+        </button>
+        <div class="mt-auto text-xs text-slate-400 px-2">Running on localhost:11434</div>
+    </aside>
+
+    <main class="flex-1 flex flex-col bg-white md:rounded-l-3xl shadow-xl relative overflow-hidden">
+        
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32">
+            <div class="flex flex-col items-center justify-center h-full text-center opacity-80" id="welcome-screen">
+                <div class="text-5xl mb-4 text-blue-500">📷</div>
+                <h2 class="text-2xl font-semibold text-slate-700 mb-2">สวัสดีครับ มีรูปอะไรให้ผมดูไหม?</h2>
+                <p class="text-slate-500 max-w-md">ผมใช้โมเดล Llama 3.2 Vision สามารถวิเคราะห์รูปภาพ อ่านป้าย หรืออธิบายสิ่งที่อยู่ในภาพได้ครับ</p>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-4 md:p-6">
+            <div class="max-w-4xl mx-auto relative">
+                
+                <div id="imagePreviewBox" class="image-preview-container">
+                    <img id="previewImg" src="" class="h-24 rounded-lg border border-slate-200">
+                    <div class="remove-img-btn" onclick="clearImage()">×</div>
+                </div>
+
+                <div class="bg-[#f0f4f9] rounded-3xl flex items-end p-2 shadow-inner border border-slate-200 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
+                    
+                    <button onclick="document.getElementById('fileInput').click()" class="p-3 m-1 text-slate-500 hover:bg-slate-200 rounded-full transition-colors" title="อัปโหลดรูปภาพ">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                        </svg>
+                    </button>
+                    <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect()">
+
+                    <textarea id="userInput" rows="1" 
+                        class="w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-2 text-slate-700 placeholder-slate-400 max-h-32 overflow-y-auto"
+                        placeholder="อัปโหลดรูป หรือถามคำถามที่นี่..."
+                        onkeydown="handleKeyDown(event)"></textarea>
+                    
+                    <button onclick="sendMessage()" id="sendBtn" 
+                        class="p-3 m-1 bg-white hover:bg-blue-50 text-blue-600 rounded-full transition-colors disabled:opacity-50 shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Setup Highlight.js & Marked 
+        marked.setOptions({
+            highlight: function(code, lang) {
+                const language = highlight.getLanguage(lang) ? lang : 'plaintext';
+                return highlight.highlight(code, { language }).value;
+            },
+            langPrefix: 'hljs language-'
+        });
+
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const fileInput = document.getElementById('fileInput');
+        const imagePreviewBox = document.getElementById('imagePreviewBox');
+        const previewImg = document.getElementById('previewImg');
+
+        let currentBase64Image = null; // เก็บค่ารูปภาพชั่วคราว
+
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if(this.value === '') this.style.height = 'auto';
+        });
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // จัดการการเลือกไฟล์
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentBase64Image = e.target.result; // เก็บ Full Base64
+                    previewImg.src = currentBase64Image;
+                    imagePreviewBox.style.display = 'block';
+                    userInput.focus();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearImage() {
+            fileInput.value = "";
+            currentBase64Image = null;
+            imagePreviewBox.style.display = 'none';
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            
+            // ถ้าไม่มีทั้งรูปและข้อความ ให้ไม่ทำอะไร
+            if (!text && !currentBase64Image) return;
+
+            if (welcomeScreen) welcomeScreen.style.display = 'none';
+
+            // 1. แสดง User Message
+            addMessage('user', text, currentBase64Image);
+            
+            // เตรียมข้อมูลส่ง AI (เก็บค่าไว้ก่อนเคลียร์หน้าจอ)
+            const payloadContent = text || "Describe this image";
+            // ตัด header ของ base64 ออก (data:image/jpeg;base64,...)
+            const imageToSend = currentBase64Image ? currentBase64Image.split(',')[1] : null;
+
+            // เคลียร์ Input
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            clearImage();
+            sendBtn.disabled = true;
+
+            // 2. สร้างกล่องรอ AI Message
+            const aiMsgId = 'ai-' + Date.now();
+            const loadingHtml = `<div class="flex items-center gap-2 text-slate-500"><div class="dot-flashing"></div> กำลังวิเคราะห์ข้อมูล...</div>`;
+            addMessage('ai', loadingHtml, aiMsgId);
+
+            try {
+                const response = await fetch("http://localhost:11434/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: "llama3.2-vision",
+                        messages: [{
+                            role: "user",
+                            content: payloadContent,
+                            images: imageToSend ? [imageToSend] : []
+                        }],
+                        stream: true
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = "";
+                const aiMsgDiv = document.getElementById(aiMsgId).querySelector('.ai-content');
+                aiMsgDiv.innerHTML = ""; // ลบ Loading ออก
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (!line) continue;
+                        try {
+                            const json = JSON.parse(line);
+                            if (json.message && json.message.content) {
+                                fullResponse += json.message.content;
+                                // Render Markdown Real-time
+                                aiMsgDiv.innerHTML = marked.parse(fullResponse);
+                                aiMsgDiv.querySelectorAll('pre code').forEach((block) => {
+                                    hljs.highlightElement(block);
+                                });
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        } catch (e) { console.error(e); }
+                    }
+                }
+
+            } catch (error) {
+                document.getElementById(aiMsgId).innerHTML = `<span class="text-red-500">Error: เชื่อมต่อ Ollama ไม่ได้ (ตรวจสอบ CORS)</span>`;
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        function addMessage(role, text, imageSrc = null) {
+            const div = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            if (role === 'ai') bubble.id = arguments[2]; // id for AI container
+
+            if (role === 'user') {
+                bubble.className = "bg-[#d3e3fd] text-slate-800 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[80%] shadow-sm flex flex-col gap-2";
+                let contentHtml = "";
+                if(imageSrc) contentHtml += `<img src="${imageSrc}" class="max-w-full rounded-lg border border-white/50 max-h-60 object-contain self-end">`;
+                if(text) contentHtml += `<div>${text}</div>`;
+                bubble.innerHTML = contentHtml;
+            } else {
+                bubble.className = "w-full max-w-4xl pr-4 pl-0 md:pl-4";
+                bubble.innerHTML = `
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md">🦙</div>
+                        <div class="flex-1 space-y-2 overflow-hidden prose max-w-none text-slate-700 ai-content">${text}</div>
+                    </div>
+                `;
+            }
+
+            div.appendChild(bubble);
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
